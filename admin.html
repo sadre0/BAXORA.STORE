@@ -1,1 +1,390 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BAXORA Admin</title><link rel="stylesheet" href="styles.css"><style>body{background:#f5f7fa}.wrap{max-width:900px;margin:45px auto;padding:0 20px}.panel{background:white;padding:24px;margin:20px 0;border:1px solid #e6eaf0;border-radius:5px}.warn{background:#fff4e9;padding:14px;font-size:12px;line-height:1.6;color:#80502d}.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.form input,.form select{padding:12px;border:1px solid #ddd;font:13px 'DM Sans'}.form button{padding:13px;background:#f47721;color:white;border:0;cursor:pointer}.item{display:flex;gap:12px;align-items:center;border-bottom:1px solid #eee;padding:12px}.item img{width:55px;height:55px;object-fit:cover}.item span{flex:1;font-size:13px}.item button{border:0;padding:9px;background:#fff0ed;color:#a43b2a}</style></head><body><div class="top">BAXORA · STORE MANAGEMENT</div><main class="wrap"><p><a href="index.html">← Back to storefront</a></p><h1>Store admin</h1><div class="warn"><b>Prototype notice:</b> This admin stores changes only in this browser (localStorage). It is not a secure login and changes do not sync to other visitors/devices. Before public launch, connect a database, secure owner authentication and image storage. Do not enter sensitive customer or payment data here.</div><section class="panel"><h2>Add product</h2><form id="form" class="form"><input id="name" required placeholder="Product name"><select id="cat"><option>Bags</option><option>Fashion</option><option>Electronics</option><option>Beauty</option><option>Home</option></select><input id="img" required placeholder="Image path, e.g. assets/item.jpg"><input id="desc" placeholder="Short description"><button>Add product</button></form></section><section class="panel"><h2>Catalogue</h2><div id="list"></div></section><section class="panel"><h2>Store contact</h2><p>Owner: <b>SADRE ALAM</b><br>WhatsApp: <b>+91 9135147273</b><br>Email: <b>baxorabag@gmail.com</b></p></section></main><script>const seed=[{id:1,name:'White Quilted Mini Backpack',category:'Bags',image:'assets/white-mini-backpack.png'},{id:2,name:'BAXORA Black & Orange Backpack',category:'Bags',image:'assets/baxora-black-orange-backpack.png'},{id:3,name:'Customizable Backpack',category:'Bags',image:'assets/custom-backpack.png'}];let a=JSON.parse(localStorage.getItem('baxoraProducts')||'null')||seed;function save(){localStorage.setItem('baxoraProducts',JSON.stringify(a));show()}function show(){document.querySelector('#list').innerHTML=a.map(p=>`<div class="item"><img src="${p.image}"><span><b>${p.name}</b><br>${p.category}</span><button data-id="${p.id}">Delete</button></div>`).join('')||'No products yet'}document.querySelector('#form').onsubmit=e=>{e.preventDefault();a.push({id:Date.now(),name:name.value,category:cat.value,image:img.value,desc:desc.value});save();e.target.reset()};document.querySelector('#list').onclick=e=>{if(e.target.dataset.id){a=a.filter(p=>p.id!=e.target.dataset.id);save()}};show();</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BAXORA Admin Panel</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{background:#f5f7fa;color:#17233b}
+    .wrap{max-width:950px;margin:35px auto;padding:0 18px}
+    .panel{background:#fff;padding:22px;margin:18px 0;border:1px solid #e6eaf0;border-radius:10px}
+    .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .form input,.form select,.form textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #ddd;border-radius:5px;font:14px Arial}
+    .form textarea{grid-column:1/-1;min-height:80px}
+    .form button,.action{padding:12px 17px;background:#f47721;color:white;border:0;border-radius:5px;cursor:pointer}
+    .secondary{background:#243653}
+    .danger{background:#a43b2a}
+    .item{display:flex;gap:12px;align-items:center;border-bottom:1px solid #eee;padding:13px 0;flex-wrap:wrap}
+    .item img{width:65px;height:65px;object-fit:cover;border-radius:6px}
+    .item .details{flex:1;min-width:140px;font-size:13px}
+    .item button{padding:9px 12px;border:0;border-radius:4px;cursor:pointer}
+    .muted{color:#667085;font-size:13px}
+    .status{padding:12px;background:#eef4ff;border-radius:6px;margin:12px 0;font-size:13px}
+    .hidden{display:none!important}
+    .check{display:flex;align-items:center;gap:8px;font-size:14px}
+    .check input{width:auto}
+    @media(max-width:600px){.form{grid-template-columns:1fr}.form textarea{grid-column:auto}.item{align-items:flex-start}}
+  </style>
+</head>
+<body>
+  <div class="top">BAXORA · STORE MANAGEMENT</div>
+
+  <main class="wrap">
+    <p><a href="index.html">← Back to storefront</a></p>
+    <h1>Store Admin</h1>
+    <p class="muted">Manage your BAXORA products and catalogue.</p>
+
+    <div id="status" class="status">Checking login...</div>
+
+    <section id="loginPanel" class="panel hidden">
+      <h2>Owner Login</h2>
+      <form id="loginForm" class="form">
+        <input id="email" type="email" placeholder="Owner email" required>
+        <input id="password" type="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
+    </section>
+
+    <div id="adminArea" class="hidden">
+      <section class="panel">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+          <div>
+            <h2>Product Management</h2>
+            <p class="muted" id="ownerEmail"></p>
+          </div>
+          <button id="logoutBtn" class="action secondary" type="button">Logout</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 id="formTitle">Add Product</h2>
+        <form id="productForm" class="form">
+          <input id="productName" placeholder="Product name" required>
+
+          <select id="category">
+            <option value="Bags">Bags</option>
+            <option value="Fashion">Fashion</option>
+            <option value="Electronics">Electronics</option>
+            <option value="Beauty">Beauty</option>
+            <option value="Home">Home</option>
+          </select>
+
+          <input id="price" type="number" min="0" step="0.01" placeholder="Price (leave empty for WhatsApp price)">
+
+          <input id="photo" type="file" accept="image/*">
+
+          <textarea id="description" placeholder="Product description"></textarea>
+
+          <label class="check">
+            <input id="active" type="checkbox" checked>
+            Show this product on storefront
+          </label>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button id="saveBtn" type="submit">Save Product</button>
+            <button id="cancelBtn" class="action secondary hidden" type="button">Cancel Edit</button>
+          </div>
+        </form>
+        <p class="muted">For a new product, select a photo. For editing, you can keep its existing photo by leaving this field empty. Maximum photo size: 5 MB.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Catalogue</h2>
+        <div id="list">Loading products...</div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h3>Store Contact</h3>
+      <p>Owner: <b>SADRE ALAM</b><br>
+      WhatsApp: <b>+91 9135147273</b><br>
+      Email: <b>baxorabag@gmail.com</b></p>
+    </section>
+  </main>
+
+<script>
+const SUPABASE_URL = "https://sixuklztzisetrbgxplp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xI5S3GmGD5ZEDLVRd7ujZA_TBe4HwNt";
+
+const OWNER_ID = "7c24bda7-2f30-4e65-8d92-1619e5e7127d";
+const BUCKET = "products";
+
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+let editingId = null;
+let currentImage = "";
+
+const $ = id => document.getElementById(id);
+
+function status(message) {
+  $("status").textContent = message;
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[c]);
+}
+
+function setLoggedIn(user) {
+  $("loginPanel").classList.add("hidden");
+  $("adminArea").classList.remove("hidden");
+  $("ownerEmail").textContent = "Logged in as " + user.email;
+}
+
+function setLoggedOut() {
+  $("adminArea").classList.add("hidden");
+  $("loginPanel").classList.remove("hidden");
+}
+
+async function checkOwner() {
+  const { data, error } = await db.auth.getSession();
+
+  if (error || !data.session) {
+    setLoggedOut();
+    status("Please login with your BAXORA owner account.");
+    return;
+  }
+
+  const user = data.session.user;
+
+  if (user.id !== OWNER_ID) {
+    await db.auth.signOut();
+    setLoggedOut();
+    status("Access denied. This account is not the BAXORA owner.");
+    return;
+  }
+
+  setLoggedIn(user);
+  status("Owner authenticated. Admin panel ready.");
+  await loadProducts();
+}
+
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  status("Logging in...");
+
+  const { data, error } = await db.auth.signInWithPassword({
+    email: $("email").value.trim(),
+    password: $("password").value
+  });
+
+  if (error) {
+    status("Login failed: " + error.message);
+    return;
+  }
+
+  $("password").value = "";
+
+  if (data.user.id !== OWNER_ID) {
+    await db.auth.signOut();
+    setLoggedOut();
+    status("Access denied. This is not the BAXORA owner account.");
+    return;
+  }
+
+  setLoggedIn(data.user);
+  status("Login successful.");
+  await loadProducts();
+});
+
+$("logoutBtn").addEventListener("click", async () => {
+  await db.auth.signOut();
+  setLoggedOut();
+  status("You have logged out.");
+});
+
+async function loadProducts() {
+  $("list").textContent = "Loading products...";
+
+  const { data, error } = await db
+    .from("products")
+    .select("id,name,description,price,image_url,category,is_active,created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    $("list").textContent = "Could not load products: " + error.message;
+    return;
+  }
+
+  if (!data.length) {
+    $("list").textContent = "No products found.";
+    return;
+  }
+
+  $("list").innerHTML = data.map(p => `
+    <div class="item">
+      <img src="${escapeHTML(p.image_url || "assets/baxora-logo.png")}" alt="">
+      <div class="details">
+        <b>${escapeHTML(p.name)}</b><br>
+        ${escapeHTML(p.category || "Bags")} ·
+        ${p.price == null ? "Price on WhatsApp" : "₹" + escapeHTML(p.price)}<br>
+        <span class="muted">${p.is_active ? "Active" : "Hidden"}</span>
+      </div>
+      <button class="action secondary" data-edit="${escapeHTML(p.id)}">Edit</button>
+      <button class="action danger" data-delete="${escapeHTML(p.id)}">Delete</button>
+    </div>
+  `).join("");
+}
+
+async function uploadPhoto(file) {
+  if (!file) return currentImage;
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please select an image file.");
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Image must be smaller than 5 MB.");
+  }
+
+  const extension = (file.name.split(".").pop() || "jpg")
+    .toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const path = "products/" + crypto.randomUUID() + "." + extension;
+
+  const { error } = await db.storage
+    .from(BUCKET)
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type
+    });
+
+  if (error) throw error;
+
+  const { data } = db.storage
+    .from(BUCKET)
+    .getPublicUrl(path);
+
+  return data.publicUrl;
+}
+
+function resetForm() {
+  editingId = null;
+  currentImage = "";
+  $("productForm").reset();
+  $("active").checked = true;
+  $("formTitle").textContent = "Add Product";
+  $("saveBtn").textContent = "Save Product";
+  $("cancelBtn").classList.add("hidden");
+}
+
+$("cancelBtn").addEventListener("click", resetForm);
+
+$("productForm").addEventListener("submit", async e => {
+  e.preventDefault();
+
+  const { data: sessionData } = await db.auth.getSession();
+  const user = sessionData.session?.user;
+
+  if (!user || user.id !== OWNER_ID) {
+    status("Please login with the BAXORA owner account.");
+    setLoggedOut();
+    return;
+  }
+
+  $("saveBtn").disabled = true;
+  status("Saving product...");
+
+  try {
+    const file = $("photo").files[0];
+    const imageUrl = await uploadPhoto(file);
+
+    if (!imageUrl) {
+      throw new Error("Please select a product photo.");
+    }
+
+    const product = {
+      name: $("productName").value.trim(),
+      category: $("category").value,
+      description: $("description").value.trim(),
+      price: $("price").value === "" ? null : Number($("price").value),
+      image_url: imageUrl,
+      is_active: $("active").checked
+    };
+
+    const result = editingId
+      ? await db.from("products").update(product).eq("id", editingId)
+      : await db.from("products").insert(product);
+
+    if (result.error) throw result.error;
+
+    status(editingId ? "Product updated successfully." : "Product added successfully.");
+    resetForm();
+    await loadProducts();
+
+  } catch (error) {
+    status("Error: " + error.message);
+  } finally {
+    $("saveBtn").disabled = false;
+  }
+});
+
+$("list").addEventListener("click", async e => {
+  const editId = e.target.dataset.edit;
+  const deleteId = e.target.dataset.delete;
+
+  if (editId) {
+    const { data, error } = await db
+      .from("products")
+      .select("*")
+      .eq("id", editId)
+      .single();
+
+    if (error) {
+      status("Could not open product: " + error.message);
+      return;
+    }
+
+    editingId = data.id;
+    currentImage = data.image_url || "";
+
+    $("productName").value = data.name || "";
+    $("category").value = data.category || "Bags";
+    $("price").value = data.price ?? "";
+    $("description").value = data.description || "";
+    $("active").checked = data.is_active;
+    $("photo").value = "";
+
+    $("formTitle").textContent = "Edit Product";
+    $("saveBtn").textContent = "Update Product";
+    $("cancelBtn").classList.remove("hidden");
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  if (deleteId) {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+
+    const { error } = await db
+      .from("products")
+      .delete()
+      .eq("id", deleteId);
+
+    if (error) {
+      status("Delete failed: " + error.message);
+      return;
+    }
+
+    status("Product deleted.");
+    await loadProducts();
+  }
+});
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT") {
+    setLoggedOut();
+  }
+});
+
+checkOwner();
+</script>
+</body>
+  </html>
+  
