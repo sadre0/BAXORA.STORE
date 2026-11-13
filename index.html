@@ -7,6 +7,25 @@
 <title>BAXORA — Shop Beyond Ordinary</title>
 <link rel="icon" href="assets/baxora-logo.png">
 <link rel="stylesheet" href="styles.css">
+<style>
+.footer-links {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:12px 22px;
+  padding:18px 12px;
+  border-top:1px solid rgba(255,255,255,.14);
+}
+.footer-links a {
+  color:inherit;
+  text-decoration:none;
+  font-size:13px;
+}
+.footer-links a:hover {
+  text-decoration:underline;
+  color:#ff9b35;
+}
+</style>
 </head>
 <body>
 
@@ -14,7 +33,7 @@
 
 <header>
 <a class="brand" href="#">
-<img src="assets/baxora-logo.png">
+<img src="assets/baxora-logo.png" alt="BAXORA logo">
 <span>BAXORA<small>SHOP BEYOND ORDINARY</small></span>
 </a>
 <nav>
@@ -70,7 +89,7 @@
 </section>
 
 <section id="about" class="about">
-<img src="assets/baxora-logo.png">
+<img src="assets/baxora-logo.png" alt="BAXORA logo">
 <div>
 <label>A NOTE FROM THE FOUNDER</label>
 <h2>Welcome to <i>BAXORA.</i></h2>
@@ -92,6 +111,13 @@
 <b>BAXORA</b>
 <span>© <span id="year"></span> BAXORA · SADRE ALAM</span>
 <a href="mailto:baxorabag@gmail.com">baxorabag@gmail.com</a>
+
+<div class="footer-links">
+<a href="privacy.html">Privacy Policy</a>
+<a href="return-refund.html">Return & Refund</a>
+<a href="terms.html">Terms & Conditions</a>
+<a href="contact.html">Contact Us</a>
+</div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
