@@ -1,4 +1,3 @@
-
 const defaultProducts = [
   {
     id: 1,
@@ -73,3 +72,4 @@ document.getElementById("year").textContent =
   new Date().getFullYear();
 
 renderProducts();
+
