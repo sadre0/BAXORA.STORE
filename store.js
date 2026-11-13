@@ -1,29 +1,23 @@
-const defaultProducts = [
-  {
-    id: 1,
-    name: "White Quilted Mini Backpack",
-    category: "Bags",
-    image: "assets/white-mini-backpack.png"
-  },
-  {
-    id: 2,
-    name: "BAXORA Black & Orange Backpack",
-    category: "Bags",
-    image: "assets/baxora-black-orange-backpack.png"
-  },
-  {
-    id: 3,
-    name: "Customizable Backpack",
-    category: "Bags",
-    image: "assets/custom-backpack.png"
-  }
-];
+const SUPABASE_URL = "https://sixuklztzisetrbgxplp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_xI5S3GmGD5ZEDLVRd7ujZA_TBe4HwNt";
 
-let products = JSON.parse(
-  localStorage.getItem("baxoraProducts") || "null"
-) || defaultProducts;
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
 
+let products = [];
 let activeCategory = "All";
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
 
 function renderProducts() {
   const grid = document.getElementById("products");
@@ -31,45 +25,116 @@ function renderProducts() {
 
   const search = (
     document.getElementById("search")?.value || ""
-  ).toLowerCase();
+  ).trim().toLowerCase();
 
-  const filtered = products.filter(p =>
-    (activeCategory === "All" || p.category === activeCategory) &&
-    p.name.toLowerCase().includes(search)
-  );
+  const filtered = products.filter(p => {
+    const category = (p.category || "").toLowerCase();
 
-  grid.innerHTML = filtered.map(p => `
-    <article class="product">
-      <div class="pic">
-        <img src="${p.image}" alt="${p.name}"
-          style="width:100%;height:190px;object-fit:cover"
-          onerror="this.src='assets/baxora-logo.png'">
-      </div>
-      <div>
-        <small>${p.category}</small>
-        <h3>${p.name}</h3>
-        <p>Price on WhatsApp</p>
-        <a target="_blank" href="https://wa.me/919135147273?text=${encodeURIComponent('Hello BAXORA, I am interested in '+p.name)}">
-          Enquire on WhatsApp ↗
-        </a>
-      </div>
-    </article>
-  `).join("");
+    const categoryMatch =
+      activeCategory === "All" ||
+      (activeCategory === "Bags" && category.includes("bag")) ||
+      category === activeCategory.toLowerCase();
+
+    const searchMatch =
+      (p.name || "").toLowerCase().includes(search);
+
+    return categoryMatch && searchMatch;
+  });
+
+  if (!filtered.length) {
+    grid.innerHTML = "<p>No products found.</p>";
+    return;
+  }
+
+  grid.innerHTML = filtered.map(p => {
+    const name = escapeHTML(p.name);
+    const category = escapeHTML(p.category || "Bags");
+    const image = escapeHTML(
+      p.image_url || "assets/baxora-logo.png"
+    );
+
+    const price = p.price == null
+      ? "Price on WhatsApp"
+      : "₹" + Number(p.price).toLocaleString("en-IN");
+
+    const message = encodeURIComponent(
+      "Hello BAXORA, I am interested in " + p.name
+    );
+
+    return `
+      <article class="card">
+        <img
+          src="${image}"
+          alt="${name}"
+          loading="lazy"
+          onerror="this.onerror=null;this.src='assets/baxora-logo.png'"
+        >
+        <div class="info">
+          <small>${category}</small>
+          <h3>${name}</h3>
+          <p>${price}</p>
+          <a
+            href="https://wa.me/919135147273?text=${message}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Enquire on WhatsApp ↗
+          </a>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+async function loadProducts() {
+  const grid = document.getElementById("products");
+
+  if (grid) {
+    grid.innerHTML = "<p>Loading BAXORA products...</p>";
+  }
+
+  const { data, error } = await db
+    .from("products")
+    .select("id,name,description,price,image_url,category,is_active,created_at")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("BAXORA Supabase error:", error);
+
+    if (grid) {
+      grid.innerHTML =
+        "<p>Products could not be loaded. Please try again later.</p>";
+    }
+    return;
+  }
+
+  products = data || [];
+  renderProducts();
 }
 
 document.querySelectorAll("[data-cat]").forEach(button => {
   button.addEventListener("click", () => {
-    activeCategory = button.dataset.cat;
+    activeCategory = button.dataset.cat || "All";
+
+    document.querySelectorAll("[data-cat]").forEach(item => {
+      item.classList.remove("chosen");
+    });
+
+    button.classList.add("chosen");
     renderProducts();
   });
 });
 
 document.getElementById("search")?.addEventListener(
-  "input", renderProducts
+  "input",
+  renderProducts
 );
 
-document.getElementById("year").textContent =
-  new Date().getFullYear();
+const year = document.getElementById("year");
 
-renderProducts();
+if (year) {
+  year.textContent = new Date().getFullYear();
+}
 
+loadProducts();
